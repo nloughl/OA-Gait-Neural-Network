@@ -1,13 +1,16 @@
-# Gait Neural Network Implementation
+# Complete Implementation Guide for Gait Waveform Classification
+# This script shows how to use the neural network with your specific data
 
-#### DATA PREPARATION ####
+# ===========================
+# STEP 1: COMPLETE YOUR DATA PREPARATION
+# ===========================
 
 import pandas as pd
 import numpy as np 
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
-# Import data 
+# Your existing data preparation code
 df = pd.read_csv("dat_nn.csv")
 
 # Check that you have exactly 100 items per subject per signal
@@ -257,3 +260,239 @@ def cross_validate_model(n_splits=5):
     print(f"\n=== Cross-Validation Results ===")
     print(f"Mean Accuracy: {np.mean(cv_accuracies):.2f}% ± {np.std(cv_accuracies):.2f}%")
     print(f"Mean AUC: {np.mean(cv_aucs):.4f} ± {np.std(cv_aucs):.4f}")
+    
+    return cv_accuracies, cv_aucs
+
+# ===========================
+# STEP 8: ADVANCED ANALYSIS
+# ===========================
+
+def analyze_gait_patterns(parameters, scaler, X_train, y_train):
+    """
+    Analyze what gait patterns the model has learned
+    """
+    print("\n=== Gait Pattern Analysis ===")
+    
+    # Get feature names
+    feature_names = df_final.drop(columns=['subject', 'group']).columns.tolist()
+    
+    # Separate frontal and sagittal features
+    frontal_features = [f for f in feature_names if f.startswith('X_')]
+    sagittal_features = [f for f in feature_names if f.startswith('Y_')]
+    
+    # Get average patterns for each group
+    X_train_scaled = scaler.transform(X_train)
+    
+    healthy_mask = y_train == 'healthy'  # Adjust based on your labels
+    oa_mask = y_train == 'OA'  # Adjust based on your labels
+    
+    healthy_avg = X_train_scaled[healthy_mask].mean(axis=0)
+    oa_avg = X_train_scaled[oa_mask].mean(axis=0)
+    
+    # Plot average gait patterns
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Frontal plane (first 100 features)
+    ax1.plot(healthy_avg[:100], label='Healthy', color='blue', alpha=0.7)
+    ax1.plot(oa_avg[:100], label='OA', color='red', alpha=0.7)
+    ax1.set_title('Average Frontal Plane Gait Pattern')
+    ax1.set_xlabel('Gait Cycle (%)')
+    ax1.set_ylabel('Normalized Amplitude')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Sagittal plane (next 100 features)
+    ax2.plot(healthy_avg[100:], label='Healthy', color='blue', alpha=0.7)
+    ax2.plot(oa_avg[100:], label='OA', color='red', alpha=0.7)
+    ax2.set_title('Average Sagittal Plane Gait Pattern')
+    ax2.set_xlabel('Gait Cycle (%)')
+    ax2.set_ylabel('Normalized Amplitude')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Calculate differences
+    difference_frontal = oa_avg[:100] - healthy_avg[:100]
+    difference_sagittal = oa_avg[100:] - healthy_avg[100:]
+    
+    # Plot differences
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    ax1.plot(difference_frontal, color='purple', linewidth=2)
+    ax1.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax1.set_title('Difference in Frontal Plane (OA - Healthy)')
+    ax1.set_xlabel('Gait Cycle (%)')
+    ax1.set_ylabel('Amplitude Difference')
+    ax1.grid(True, alpha=0.3)
+    
+    ax2.plot(difference_sagittal, color='orange', linewidth=2)
+    ax2.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax2.set_title('Difference in Sagittal Plane (OA - Healthy)')
+    ax2.set_xlabel('Gait Cycle (%)')
+    ax2.set_ylabel('Amplitude Difference')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return healthy_avg, oa_avg, difference_frontal, difference_sagittal
+
+def plot_learning_curves_comparison(results_list, labels):
+    """
+    Compare learning curves from different model configurations
+    """
+    plt.figure(figsize=(12, 8))
+    
+    for costs, label in zip(results_list, labels):
+        plt.plot(costs, label=label, linewidth=2)
+    
+    plt.xlabel('Iterations (per hundreds)')
+    plt.ylabel('Cost')
+    plt.title('Learning Curves Comparison')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+def generate_model_report(parameters, scaler, costs, importance_df, 
+                         test_accuracy, test_auc, cv_results=None):
+    """
+    Generate a comprehensive model report
+    """
+    print("\n" + "="*60)
+    print("           GAIT WAVEFORM CLASSIFICATION REPORT")
+    print("="*60)
+    
+    # Model Architecture
+    L = len(parameters) // 2
+    print(f"\nMODEL ARCHITECTURE:")
+    print(f"  - Number of layers: {L}")
+    print(f"  - Input features: {parameters['W1'].shape[1]}")
+    for i in range(1, L):
+        print(f"  - Hidden layer {i}: {parameters[f'W{i}'].shape[0]} neurons")
+    print(f"  - Output layer: {parameters[f'W{L}'].shape[0]} neuron(s)")
+    
+    # Training Performance
+    print(f"\nTRAINING PERFORMANCE:")
+    print(f"  - Final training cost: {costs[-1]:.6f}")
+    print(f"  - Training converged: {'Yes' if costs[-1] < costs[0] * 0.1 else 'No'}")
+    
+    # Test Performance
+    print(f"\nTEST PERFORMANCE:")
+    print(f"  - Test Accuracy: {test_accuracy:.2f}%")
+    print(f"  - Test AUC: {test_auc:.4f}")
+    
+    # Cross-validation (if available)
+    if cv_results:
+        cv_acc, cv_auc = cv_results
+        print(f"\nCROSS-VALIDATION RESULTS:")
+        print(f"  - Mean CV Accuracy: {np.mean(cv_acc):.2f}% ± {np.std(cv_acc):.2f}%")
+        print(f"  - Mean CV AUC: {np.mean(cv_auc):.4f} ± {np.std(cv_auc):.4f}")
+    
+    # Feature Importance
+    print(f"\nFEATURE IMPORTANCE:")
+    frontal_features = [f for f in importance_df['feature'] if f.startswith('X_')]
+    sagittal_features = [f for f in importance_df['feature'] if f.startswith('Y_')]
+    
+    frontal_importance = importance_df[importance_df['feature'].isin(frontal_features)]['importance'].mean()
+    sagittal_importance = importance_df[importance_df['feature'].isin(sagittal_features)]['importance'].mean()
+    
+    print(f"  - Average frontal plane importance: {frontal_importance:.4f}")
+    print(f"  - Average sagittal plane importance: {sagittal_importance:.4f}")
+    print(f"  - Most important plane: {'Frontal' if frontal_importance > sagittal_importance else 'Sagittal'}")
+    
+    print(f"\nTOP 5 MOST IMPORTANT FEATURES:")
+    for i, row in importance_df.head(5).iterrows():
+        plane = "Frontal" if row['feature'].startswith('X_') else "Sagittal"
+        time_point = row['feature'].split('_')[1]
+        print(f"  {i+1}. {row['feature']} ({plane} plane, {time_point}% gait cycle) - {row['importance']:.4f}")
+    
+    print("\n" + "="*60)
+
+# ===========================
+# STEP 9: MAIN EXECUTION
+# ===========================
+
+if __name__ == "__main__":
+    """
+    Main execution script - run this to perform complete analysis
+    """
+    
+    print("Starting Gait Waveform Classification Analysis...")
+    
+    # Step 1: Basic model training
+    print("\n### STEP 1: Basic Model Training ###")
+    parameters, scaler, costs, importance_df = run_gait_classification_pipeline()
+    
+    # Step 2: Cross-validation
+    print("\n### STEP 2: Cross-Validation ###")
+    cv_accuracies, cv_aucs = cross_validate_model(n_splits=5)
+    
+    # Step 3: Hyperparameter search (optional - takes longer)
+    # print("\n### STEP 3: Hyperparameter Search ###")
+    # results_df, best_params = hyperparameter_search()
+    
+    # Step 4: Gait pattern analysis
+    print("\n### STEP 4: Gait Pattern Analysis ###")
+    healthy_avg, oa_avg, diff_frontal, diff_sagittal = analyze_gait_patterns(
+        parameters, scaler, X_train, y_train
+    )
+    
+    # Step 5: Generate comprehensive report
+    print("\n### STEP 5: Final Report ###")
+    
+    # Get test performance
+    X_train_proc, X_test_proc, y_train_proc, y_test_proc, _ = preprocess_gait_data(
+        X_train, X_test, y_train, y_test
+    )
+    test_accuracy, test_auc, _, _ = evaluate_model(X_test_proc, y_test_proc, parameters)
+    
+    generate_model_report(
+        parameters, scaler, costs, importance_df, 
+        test_accuracy, test_auc, 
+        cv_results=(cv_accuracies, cv_aucs)
+    )
+    
+    print("\nAnalysis complete! Check the plots and reports above.")
+    print("Model parameters and scaler have been saved for future predictions.")
+
+# ===========================
+# STEP 10: DEPLOYMENT HELPER
+# ===========================
+
+def save_model_for_deployment(parameters, scaler, filename_prefix="gait_model"):
+    """
+    Save trained model for later use
+    """
+    import pickle
+    
+    # Save parameters
+    with open(f"{filename_prefix}_parameters.pkl", "wb") as f:
+        pickle.dump(parameters, f)
+    
+    # Save scaler
+    with open(f"{filename_prefix}_scaler.pkl", "wb") as f:
+        pickle.dump(scaler, f)
+    
+    print(f"Model saved as {filename_prefix}_parameters.pkl and {filename_prefix}_scaler.pkl")
+
+def load_model_for_prediction(filename_prefix="gait_model"):
+    """
+    Load trained model for predictions
+    """
+    import pickle
+    
+    # Load parameters
+    with open(f"{filename_prefix}_parameters.pkl", "rb") as f:
+        parameters = pickle.load(f)
+    
+    # Load scaler
+    with open(f"{filename_prefix}_scaler.pkl", "rb") as f:
+        scaler = pickle.load(f)
+    
+    return parameters, scaler
+
+# Example usage for saving/loading:
+# save_model_for_deployment(parameters, scaler)
+# loaded_params, loaded_scaler = load_model_for_prediction()
